@@ -619,14 +619,14 @@ else:
     print(f"REPL - MSMSBPL 0.1")
     f = {}
     while True:
-        act = input(f"{stack}\n] ")
+        act = input(f"{stack}\n>>> ")
         if act == "exit":
             break
         elif act == "...":
             act = []
             print("Multiline Prompt (enter an empty line to execute the code and exit)")
             while True:
-                a = input(f" > ")
+                a = input(f"...  ")
                 if a == "":
                     break
                 elif a == ".back":
