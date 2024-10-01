@@ -3,7 +3,7 @@ import os, sys, pickle, time, atexit
 
 LOCDIR = os.path.dirname(sys.argv[0])
 LIBDIR = os.path.join(LOCDIR, "lib")
-VERSION = "0.1"
+VERSION = 0.2
 TIME_ELAPSED = lambda: print(f"\nTime Elapsed (s): {time.time()-START:,.8f}\n")
 
 if not os.path.isdir(LIBDIR):
