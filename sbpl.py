@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import os, sys, pickle, time, atexit
 
 LOCDIR = os.path.dirname(sys.argv[0])
@@ -42,10 +41,6 @@ def exprs(args):
 def process(code, name="__main__"):
     res = []
     oname = name
-    if name in includes:
-        return res
-    else:
-        includes.add(name)
     c = enumerate(code.split("\n"), 1)
     if "verbose" in flags:
         print(f"Processing {name!r}")
@@ -67,6 +62,10 @@ def process(code, name="__main__"):
                     if not os.path.isfile(arg):
                         print(f"\nError on line {lp} in file `{name}`\nFile {arg!r} does not exist.")
                         break
+                    if arg not in includes:
+                        includes.add(name)
+                    else:
+                        continue
                     res.extend(process(open(arg).read(), arg))
                 elif ins == "chname" and arg is not None:
                     if name != "__main__":
@@ -94,6 +93,20 @@ def process(code, name="__main__"):
         return tuple(res)
     exit(1)
 
+def minimize(lst):
+    lst = list(lst)
+    if len(lst) == 0:
+        return []
+    k = [[lst[0], 1]]
+    if len(lst) == 1:
+        return lst
+    for i in lst[1:]:
+        if i == k[-1][0]:
+            k[-1][1] += 1
+        else:
+            k.append([i, 1])
+    return [f'[{item}] * {count}' if count > 1 else item for item, count in k]
+
 def reprocess(code, name):
     return *[(pos, name if file == "__main__" else f"{name}-{file}", ins, args) for pos, file, ins, args in code],
 
@@ -102,16 +115,6 @@ def sources(code):
     for _, name, _, _ in code:
         src.add(name)
     return *src,
-
-def rotate(lst, n):
-    if not isinstance(n, int):
-        return 1
-    if len(lst) < n:
-        return 1
-    n = n % len(lst)
-    lst[:n] = lst[:n][::-1]
-    lst[n:] = lst[n:][::-1]
-    lst.reverse()
 
 def run(code, repl=False, funcs=None):
     if isinstance(code, str):
@@ -141,17 +144,13 @@ def run(code, repl=False, funcs=None):
         elif ins == "clear" and argc == 0:
             stack.clear()
         elif ins == "rot" and argc == 0:
-            if rotate(stack, 2):
+            if len(stack) < 2:
                 print(f"\nError on line {pos} in file `{file}`\nCouldnt rotate stack items!")
                 break
-        elif ins == "rot3" and argc == 0:
-            if rotate(stack, 3):
-                print(f"\nError on line {pos} in file `{file}`\nCouldnt rotate stack items!")
-                break
-        elif ins == "rotn" and argc == 1:
-            if rotate(stack, args[0]):
-                print(f"\nError on line {pos} in file `{file}`\nCouldnt rotate stack items!")
-                break
+            b, a = stack.pop(), stack.pop()
+            stack.extend([b, a])
+        elif ins == "show_stack" and argc == 0:
+            print(f"[{'' if not stack else ' '+(','+chr(10)+'  ').join(minimize(map(repr, stack)))+' '}]")
         # math
         elif ins == "add" and argc == 2:
             stack.append(args[1]+args[0])
@@ -575,7 +574,7 @@ known_flags = {
     "setup", "verbose", "version", "ver", "main-entry"
 }
 flags = set()
-for pos, val in enumerate(sys.argv[1:]):
+for pos, val in enumerate(sys.argv[1:]+[""]):
     if val.startswith("--"):
         flags.add(val[2:])
     else:
@@ -586,8 +585,9 @@ if flags:
         print("Unknown flags:", ", ".join(flags - known_flags))
 if "verbose" in flags:
     print("Flags:", flags)
+    print(f"Interpreter: {os.path.abspath(sys.argv[0])}")
     if len(sys.argv) >= 2:
-        print(f"File: {os.path.abspath(sys.argv[0])}")
+        print(f"File: {os.path.abspath(sys.argv[1])}")
 if "version" in flags or "ver" in flags:
     print("Version:", VERSION)
 program_arguments = sys.argv[1:]
@@ -607,42 +607,117 @@ if argc >= 2:
         else:
             if "main-entry" in flags:
                 if "verbose" in flags:
-                    print("Automatically calling main...")
+                    print("Automatically calling main...\n")
                     flags.remove("verbose")
                 if "main" not in ff:
                     print("\nMain function does not exist!")
                     exit(3)
-                if run(ff["main"][1], funcs=ff):
+                if run("call main", funcs=ff):
                     print("\nMain Entry: Finished with an error!")
                     exit(3)
 else:
-    print(f"REPL - MSMSBPL 0.1")
+    print(f"REPL - SBPL 0.1")
     f = {}
+    ml = {
+        "rfn", "fn",
+        "ifmain", "ifsetup", "notmain",
+        "ifeq", "ifne", "iflt", "ifgt",
+        "loop", "for", "ufor", "foreach",
+        ";multi"
+    }
     while True:
-        act = input(f"{stack}\n>>> ")
+        act = input(f"[{'' if not stack else ' '+(','+chr(10)+'  ').join(minimize(map(repr, stack)))+' '}]\n>>> ")
+        if act.split(maxsplit=1)[0] in ml:
+            t = [act]
+            while True:
+                act = input("... ")
+                if act == ".done":
+                    break
+                t.append(act)
+            act = "\n".join(t)
         if act == "exit":
             break
-        elif act == "...":
+        elif act == ".editor":
             act = []
-            print("Multiline Prompt (enter an empty line to execute the code and exit)")
+            print("Basic REPL In-memory Editor.\nEnter '.exit' to stop.\nEnter '.run' to execute code.\n'.help' for more.")
             while True:
-                a = input(f"...  ")
-                if a == "":
+                a = input(f"+++ ")
+                if a == ".exit":
                     break
                 elif a == ".back":
                     if act:
                         act.pop()
+                    else:
+                        print("No lines left.")
+                elif a == ".clear":
+                    act.clear()
                 elif a == ".run":
-                    run("\n".join(act), True, f)
+                    if run("\n".join(act), True, f):
+                        print("Error!")
+                elif a == ".load":
+                    print("Load a file. '*' to cancel.")
+                    while True:
+                        file = input("? ")
+                        if not os.path.isfile(file):
+                            print("Invalid file path!")
+                        elif file == "*":
+                            break
+                        else:
+                            with open(file) as f:
+                                stack.extend(f.read().split("\n"))
+                elif a == ".remove":
+                    while True:
+                        line = input(f"1-{len(act)}, '*' to cancel: ").strip()
+                        if not line.isdigit():
+                            print("Not a digit!")
+                        elif line == "*":
+                            break
+                        else:
+                            line = int(line)-1
+                            if line in tuple(range(len(act))):
+                                act.pop(line)
+                                break
+                            else:
+                                print("Line out of range!")
+                elif a == ".show":
+                    while True:
+                        line = input(f"1-{len(act)}, '*' to cancel: ").strip()
+                        if not line.isdigit():
+                            print("Not a digit!")
+                        elif line == "*":
+                            break
+                        else:
+                            line = int(line)-1
+                            if line in tuple(range(len(act))):
+                                print(act[line])
+                                break
+                            else:
+                                print("Line out of range!")
+                elif a == ".rshow":
+                    while True:
+                        line = input(f"1-{len(act)}, '*' to cancel: ").strip()
+                        if not line.isdigit():
+                            print("Not a digit!")
+                        elif line == "*":
+                            break
+                        else:
+                            line = int(line)-1
+                            if line in tuple(range(len(act))):
+                                print("\n".join(act[line:line+10]))
+                                break
+                            else:
+                                print("Line out of range!")
+                elif a == ".help":
+                    print("'.list' List lines.\n'.back' Erase previouly entered line.\n'.remove' Remove a specific line.\n'.show' Print a specific line.\n'.rshow' Show the specified line with the next 10 available lines.\n'.clear' Delete every line.")
                 elif a == ".list":
                     mlen = len(str(len(act)))+1
                     for i, line in enumerate(act, 1):
                         print(f"{str(i).rjust(mlen)} | {line}")
                 else:
                     act.append(a)
-            run("\n".join(act), True, f)
         elif act.startswith("$"):
             code = os.system(act[1:])
             print(f"Error Code: {'success' if not code else code}")
         else:
-            run(act, True, f)
+            if run(act, True, f):
+                print("Error!")
