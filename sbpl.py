@@ -3,7 +3,7 @@ import os, sys, pickle, time, atexit
 
 LOCDIR = os.path.dirname(sys.argv[0])
 LIBDIR = os.path.join(LOCDIR, "lib")
-VERSION = 0.2
+VERSION = "0.1"
 TIME_ELAPSED = lambda: print(f"\nTime Elapsed (s): {time.time()-START:,.8f}\n")
 
 if not os.path.isdir(LIBDIR):
@@ -13,16 +13,30 @@ if not os.path.isdir(LIBDIR):
 stack = []
 includes = set()
 
+chars = {
+    "\\\\":"\\[escape]",
+    "\\n":"\n",
+    "\\t":"\t",
+    "\\s":"\s",
+    "\\v":"\v",
+    "\\f":"\f",
+    "\\r":"\r",
+    "\\[win_nl]":"\r\n",
+    "\\[unix_nl]":"\n",
+    "\\[null]":"\0",
+    "\\[escape]":"\\"
+}
+
 def expr(arg):
     arg = arg.strip()
     if arg == "top":
         return stack.pop() if stack else 0
     elif arg == "top:peek":
         return stack[-1] if stack else 0
-    elif arg == "bottom:peek":
-        return stack[0] if stack else 0
     elif arg == "bottom":
         return stack.pop(0) if stack else 0
+    elif arg == "bottom:peek":
+        return stack[0] if stack else 0
     elif arg.endswith("i"):
         return int(arg[:-1])
     elif arg.endswith("f"):
@@ -31,11 +45,24 @@ def expr(arg):
         return 1
     elif arg == "false":
         return 0
-    return arg
+    elif arg.isalnum():
+        return arg
+    return 0
 
 def exprs(args):
-    if args and args[0] == "string:":
-        return " ".join(args[1:]),
+    if args and args[0] == "string:" and args[-1].endswith(":end"):
+        text = " ".join(args[1:])[:-4]
+        for c, r in chars.items():
+            text = text.replace(c, r)
+        return text,
+    elif "verbose" in flags and args and args[0] == "string:":
+        print("Warning: String doesnt have an ':end' marker!")
+    elif "verbose" in flags and args and args[0].startswith("string:"):
+        text = args[0].split(":", maxsplit=1)[1]
+        t2 = " ".join(args[1:])
+        if t2:
+            text += " "+t2
+        print(f"Warning: Did you mean 'string: {text}'")
     return *map(expr, args),
 
 def process(code, name="__main__"):
@@ -542,7 +569,7 @@ def run(code, repl=False, funcs=None):
         elif ins == "println":
             print(*args)
         elif ins == "input" and argc == 0:
-            stack.append(input)
+            stack.append(input())
         # type casting
         elif ins == "toint" and argc == 1:
             try:
@@ -563,7 +590,7 @@ def run(code, repl=False, funcs=None):
             print(f"\nError on line {pos} in file `{file}`\nPanic!")
             break
         else:
-            print(f"\nError on line {pos} in file `{file}`\nInvalid instruction: {ins}")
+            print(f"\nError on line {pos} in file `{file}`\nInvalid instruction: {ins}\nArguments: {' '.join(map(repr, args))}")
             break
         p += 1
     else:
@@ -574,7 +601,7 @@ known_flags = {
     "setup", "verbose", "version", "ver", "main-entry"
 }
 flags = set()
-for pos, val in enumerate(sys.argv[1:]+[""]):
+for pos, val in enumerate(sys.argv[1:]):
     if val.startswith("--"):
         flags.add(val[2:])
     else:
