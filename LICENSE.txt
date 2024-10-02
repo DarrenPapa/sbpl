@@ -1,0 +1,45 @@
+Copyright © 2024 SBPL Maintenance. All rights reserved.
+SBPL Copyright License
+
+This program (SBPL) may not be modified without
+the explicit permission of the author, Darren Chase Papa.
+
+Any unauthorized attempt to recreate SBPL will
+result in copyright infringement.
+
+Modification without permission is permitted
+only if SBPL has the following issues:
+- Repeated crashing.
+- Unexpected behavior.
+- Failure to run.
+- Causes problems in other programs.
+- Incomplete installation.
+- Corrupted installation.
+
+Any recordings showcasing SBPL's source code
+must cite this license in the description or video.
+Failure to do so will result in a copyright strike.
+
+If you wish to contribute to this project or have a fork,
+please set it to private. You must adhere to the following rules:
+- Include this license file.
+- Code must be documented:
+  - Add documentation for specific features in:
+      "lib/core/docs/[author]" (e.g., "lib/core/docs/JohnDoe")
+  - Add documentation for any global changes in:
+      "lib/core/docs/core"
+      where the filename should reflect the general title
+      or overview of the feature (e.g., "lib/core/docs/core/stack.txt")
+
+Note:
+    The core features are documented in "docu.py"
+    and thus is not included in "lib/core/docs/core."
+
+Failure to follow these rules may result in immediate legal action.
+
+Thank you for your cooperation.
+
+Contact Information:
+- Facebook: Darren Chase Papa
+- Email: darrenchasepapa@gmail.com
+- GitHub: https://github.com/DarrenPapa
