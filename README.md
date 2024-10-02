@@ -1,6 +1,6 @@
 # SBPL - Stack Based Programming Language
 
-[See license here.](https://github.com/DarrenPapa/sbpl/LICENSE.txt)
+[See license here.](https://github.com/DarrenPapa/sbpl/blob/master/LICENSE.txt)
 
 ## Features
 
@@ -12,7 +12,7 @@ Identifiers: `basically.strings.without.quotes`
 Collections: `(( 1i 69i 138i 80085i ))` List of any types. Strings cannot be directly done as `(( " String" ))` as it isnt supported yet.
 
 ### ...
-See [docu.py](https://github.com/DarrenPapa/sbpl/docu.py) for more.
+See [docu.py](https://github.com/DarrenPapa/sbpl/blob/master/docu.py) for more.
 
 ## Info
 Made by: Darren Papa
