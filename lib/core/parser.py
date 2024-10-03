@@ -1,8 +1,44 @@
 from .info import *
+from .utils import *
+import array
+import pickle
+import atexit
 
 stack = []
+includes = set()
 
-def expr(arg):
+class bstate:
+    def __init__(self, name):
+        self.name = name
+    def __eq__(self, other):
+        if not isinstance(other, bstate):
+            return False
+        return other.name == self.name
+    def __ne__(self, other):
+        return not self == other
+    def __repr__(self):
+        return f"bstate({self.name!r})"
+
+def expr_preruntime(arg):
+    if arg.endswith("i"):
+        return int(arg[:-1])
+    elif arg.endswith("f"):
+        return float(arg[:-1])
+    elif arg == "true":
+        return 1
+    elif arg == "false":
+        return 0
+    elif arg == "nil":
+        return bstate("nil")
+    elif arg == "none":
+        return bstate("none")
+    elif arg == "mark":
+        return bstate("mark")
+    return arg
+
+def expr_runtime(arg):
+    if not isinstance(arg, str):
+        return arg
     arg = arg.strip()
     if arg == "top":
         return stack.pop() if stack else bstate("nil")
@@ -24,58 +60,51 @@ def expr(arg):
             return stack[-1][-1]
         else:
             return bstate("nil")
+    elif arg.replace(".", "").replace("_", "").isalnum():
+        return arg
+    # some how some unrpocessed integers passed
     elif arg.endswith("i"):
         return int(arg[:-1])
     elif arg.endswith("f"):
         return float(arg[:-1])
-    elif arg == "true":
-        return 1
-    elif arg == "false":
-        return 0
-    elif arg == "nil":
-        return bstate("nil")
-    elif arg == "none":
-        return bstate("none")
-    elif arg == "mark":
-        return bstate("mark")
-    elif arg.replace(".", "").replace("_", "").isalnum():
-        return arg
     return bstate("nil")
 
 def evaluate(expression):
+    if expression and expression[0] == "list":
+        return compress(expression[1:])
     match (expression):
         case [op1, "==", op2]:
-            return expr(op1) == expr(op2)
+            return expr_runtime(op1) == expr_runtime(op2)
         case [op1, "!=", op2]:
-            return expr(op1) != expr(op2)
+            return expr_runtime(op1) != expr_runtime(op2)
         case [op1, ">", op2]:
-            return expr(op1) > expr(op2)
+            return expr_runtime(op1) > expr_runtime(op2)
         case [op1, "<", op2]:
-            return expr(op1) > expr(op2)
+            return expr_runtime(op1) > expr_runtime(op2)
         case [op1, ">=", op2]:
-            return expr(op1) >= expr(op2)
+            return expr_runtime(op1) >= expr_runtime(op2)
         case [op1, "<=", op2]:
-            return expr(op1) >= expr(op2)
+            return expr_runtime(op1) >= expr_runtime(op2)
         case ["not", op1]:
-            return not expr(op1)
+            return not expr_runtime(op1)
         case [op1, "or", op2]:
-            return expr(op1) or expr(op2)
+            return expr_runtime(op1) or expr_runtime(op2)
         case [op1, "and", op2]:
-            return expr(op1) and expr(op2)
+            return expr_runtime(op1) and expr_runtime(op2)
         case [op1, "+", op2]:
-            return expr(op1) + expr(op2)
+            return expr_runtime(op1) + expr_runtime(op2)
         case [op1, "-", op2]:
-            return expr(op1) - expr(op2)
+            return expr_runtime(op1) - expr_runtime(op2)
         case [op1, "*", op2]:
-            return expr(op1) * expr(op2)
+            return expr_runtime(op1) * expr_runtime(op2)
         case [op1, "/", op2]:
-            return expr(op1) / expr(op2)
+            return expr_runtime(op1) / expr_runtime(op2)
         case [op1, "%", op2]:
-            return expr(op1) % expr(op2)
+            return expr_runtime(op1) % expr_runtime(op2)
         case [op1, "^", op2]:
-            return expr(op1) ** expr(op2)
+            return expr_runtime(op1) ** expr_runtime(op2)
         case ["len-of", op1]:
-            value = expr(op1)
+            value = expr_runtime(op1)
             if hasattr(value, "__len__"):
                 return len(value)
             else:
@@ -83,7 +112,7 @@ def evaluate(expression):
         case _:
             return bstate("nil")
 
-def exprs(args):
+def exprs_runtime(args):
     put = []
     res = []
     p = 0
@@ -118,7 +147,7 @@ def exprs(args):
             p -= 1
             put.pop()
             repeatition, *parts = put
-            res.append([*exprs(parts)]*expr(repeatition))
+            res.append(compress([*exprs_runtime(parts)]*expr_runtime(repeatition)))
         elif c == "'":
             c = ""
             p += 1
@@ -131,11 +160,14 @@ def exprs(args):
                 text = text.replace(c, r)
             res.append(text.replace("\\[quote]", "'"))
         else:
-            res.append(expr(c))
+            res.append(expr_runtime(c))
         p += 1
     return *res,
 
-def process(code, name="__main__"):
+def exprs_preruntime(args):
+    return *map(expr_preruntime, args),
+
+def process(code, name=MAIN_NAME):
     res = []
     oname = name
     c = enumerate(code.split("\n"), 1)
@@ -145,7 +177,7 @@ def process(code, name="__main__"):
             continue
         elif line.startswith("#"):
             line = line[1:].strip()
-            if line.startswith("#!"):
+            if line.startswith("!"):
                 pass
             elif line:
                 ins, arg = line.split(maxsplit=1) if " " in line else (line, None)
@@ -163,10 +195,15 @@ def process(code, name="__main__"):
                         continue
                     res.extend(process(open(arg).read(), arg))
                 elif ins == "chname" and arg is not None:
-                    if name != "__main__":
+                    if name != MAIN_NAME:
                         name = arg
                 elif ins == "force.chname" and arg is not None:
                     name = arg
+                elif ins == "define" and arg is not None:
+                    if arg in includes:
+                        return tuple()
+                    else:
+                        includes.add(arg)
                 elif ins == "doNotShowTime" and arg is None:
                     atexit.unregister(TIME_ELAPSED)
                 else:
@@ -177,7 +214,7 @@ def process(code, name="__main__"):
                 exit(1)
         else:
             ins, *args = line.split()
-            args = *args,
+            args = exprs_preruntime(args)
             res.append((lp, name, ins, args))
     else:
         return tuple(res)
@@ -190,7 +227,7 @@ def run(code, funcs=None):
     p = 0
     while p < len(code):
         pos, file, ins, args = code[p]
-        args = *exprs(args),
+        args = *exprs_runtime(args),
         argc = len(args)
         # stack
         if ins == "push" and argc == 1:
@@ -305,8 +342,8 @@ def run(code, funcs=None):
             else:
                 print(f"\nError on line {opos} in file `{ofile}`\nFunction not closed!")
                 break
-            if file != "__main__":
-                name = f"{os.path.basename(file).split('.')[0]}.{name}"
+            if file != MAIN_NAME:
+                name = mangle(file, name)
             if name in funcs:
                 print(f"\nError on line {opos} in file `{ofile}`\nFunction already defined in file {funcs[name][0]!r}")
                 break
@@ -340,8 +377,8 @@ def run(code, funcs=None):
             if t == "static":
                 funcs[name] = (file, tuple())
             elif t == "dynamic":
-                if file != "__main__":
-                    name = f"{os.path.basename(file).split('.')[0]}.{name}"
+                if file != MAIN_NAME:
+                    name = mangle(file, name)
                 funcs[name] = (file, tuple())
             else:
                 print(f"\nError on line {pos} in file `{file}`\nFunction type {t!r} unknown!")
@@ -364,7 +401,7 @@ def run(code, funcs=None):
             else:
                 print(f"\nError on line {opos} in file `{ofile}`\nIf main function not closed!")
                 break
-            if file != "__main__":
+            if file != MAIN_NAME:
                 p += 1
                 continue
             try:
@@ -398,7 +435,7 @@ def run(code, funcs=None):
             else:
                 print(f"\nError on line {opos} in file `{ofile}`\nIf main function not closed!")
                 break
-            if file != "__setup__":
+            if file != SETUP_NAME:
                 p += 1
                 continue
             try:
@@ -432,7 +469,7 @@ def run(code, funcs=None):
             else:
                 print(f"\nError on line {opos} in file `{ofile}`\nIf main function not closed!")
                 break
-            if file == "__main__":
+            if file == MAIN_NAME:
                 p += 1
                 continue
             try:
@@ -466,8 +503,8 @@ def run(code, funcs=None):
                 return err
         elif ins == "dyncall" and argc == 1:
             name = args[0]
-            if file != "__main__":
-                name = f"{os.path.basename(file).split('.')[0]}.{name}"
+            if file != MAIN_NAME:
+                name = mangle(file, name)
             if name not in funcs:
                 print(f"\nError on line {pos} in file `{file}`\nInvalid function: {name}")
                 break
@@ -582,10 +619,11 @@ def run(code, funcs=None):
             stack.append(tuple(range(args[0], args[1]+1)))
         elif ins == "range" and argc == 2:
             stack.append(tuple(range(args[0], args[1])))
-        elif ins == "foreach" and argc == 0:
+        elif ins == "foreach" and argc == 1:
             temp = []
             opos = pos
             ofile = file
+            oargs = args
             p += 1
             k = 1
             while p < len(code):
@@ -604,9 +642,8 @@ def run(code, funcs=None):
             if not stack:
                 p += 1
                 continue
-            v = stack[-1]
             try:
-                for i in v:
+                for i in oargs[0]:
                     stack.append(i)
                     try:
                         err = run(temp, funcs=funcs)
@@ -757,7 +794,7 @@ def run(code, funcs=None):
         elif ins == "cache" and argc == 1:
             name = args[0]
             with open(name, "wb") as f:
-                f.write(pickle.dumps({fname:reprocess(code, name) for fname, code in funcs.items()}))
+                f.write(pickle.dumps(funcs))
         elif ins == "load" and (argc == 1 or argc == 2):
             with open(args[0], "rb") as f:
                 fs = pickle.loads(f.read())
@@ -797,7 +834,7 @@ def run(code, funcs=None):
                 return err
         elif ins == "setup" and argc == 0:
             with open(args[0], "r") as f:
-                name = "__setup__"
+                name = SETUP_NAME
                 x = process(f.read(), name)
                 fs = {}
                 if run(x, funcs=fs):

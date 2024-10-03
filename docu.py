@@ -135,14 +135,12 @@ Constants:
 Loops are useful for reducing the redundancy.
 Dont wanna dont wanna repeat stuff dont you?
 
-foreach          - Iterates through the collection at the top of the stack.
-                 Pushes the current item onto the stack.
-                 Shallow copies the iterator to avoid side effects.
-for [steps:int]  - Iterates steps number of times. Pushes the current step to
-                 the stack.
-ufor [steps:int] - Iterates steps number of times. Does not push the
-                 current step onto the stack.
-loop             - Loop indefinitely.""",
+foreach [value:iter] - Iterates through the given collection.
+for [steps:int]      - Iterates steps number of times. Pushes the current step to
+                     the stack.
+ufor [steps:int]     - Iterates steps number of times. Does not push the
+                     current step onto the stack.
+loop                 - Loop indefinitely.""",
 "BLOCKED INSTRUCTIONS":"""Instructions That Require 'end'
 
 Instructions that use code blocks.
@@ -151,6 +149,7 @@ fn
 sfn
 for
 ufor
+foreach
 loop
 module
 iftrue

@@ -35,6 +35,14 @@ Note:
     The core features are documented in "docu.py"
     and thus is not included in "lib/core/docs/core."
 
+Additional Info:
+    "lib/core/p2s_api.py" is maintained separately from the SBPL
+    interpreter, but this doesnt mean that it isnt included
+    in this license. Any modification if prohibited as it may cause
+    compatibility issues with programs. Such modifications can only
+    be done by the original authors as the changes needs properly
+    planned publishes to push the changes.
+
 Failure to follow these rules may result in immediate legal action.
 
 Thank you for your cooperation.
